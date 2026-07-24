@@ -58,3 +58,4 @@ reglerad ≈ **1088 h**, förtroende ≈ **326 h**.
       the Artifact URL is enough.
 - [ ] Maybe: a small "h/vecka × veckor" helper for projecting the truncated
       spring term (only if manual Tillägg gets tedious).
+- [ ] Create a real standardized PWA. 
