@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arbetstid — logg & täckning</title>
+<style>
+  :root{
+    --mono: ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+
+    --paper:#eaeeea; --surface:#ffffff; --inset:#f3f6f3;
+    --ink:#1b241f; --muted:#5f6f68; --rule:#d6ddd8; --rule-2:#c4cec8;
+    --accent:#2f5d4f; --accent-soft:#dfeae4;
+    --signal:#b9781f;
+    --good:#2f7d54; --warn:#a2761b; --bad:#ad4638;
+    --good-bg:#e2efe8; --warn-bg:#f2ecd8; --bad-bg:#f2e2de;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#0f130f; --surface:#161b16; --inset:#1c221d;
+      --ink:#e7ede8; --muted:#8ba095; --rule:#262e28; --rule-2:#33403a;
+      --accent:#6fbfa4; --accent-soft:#182a23;
+      --signal:#dda152;
+      --good:#65bf8a; --warn:#d3a750; --bad:#df7a6d;
+      --good-bg:#132419; --warn-bg:#27220e; --bad-bg:#291a16;
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#eaeeea; --surface:#ffffff; --inset:#f3f6f3;
+    --ink:#1b241f; --muted:#5f6f68; --rule:#d6ddd8; --rule-2:#c4cec8;
+    --accent:#2f5d4f; --accent-soft:#dfeae4; --signal:#b9781f;
+    --good:#2f7d54; --warn:#a2761b; --bad:#ad4638;
+    --good-bg:#e2efe8; --warn-bg:#f2ecd8; --bad-bg:#f2e2de;
+  }
+  :root[data-theme="dark"]{
+    --paper:#0f130f; --surface:#161b16; --inset:#1c221d;
+    --ink:#e7ede8; --muted:#8ba095; --rule:#262e28; --rule-2:#33403a;
+    --accent:#6fbfa4; --accent-soft:#182a23; --signal:#dda152;
+    --good:#65bf8a; --warn:#d3a750; --bad:#df7a6d;
+    --good-bg:#132419; --warn-bg:#27220e; --bad-bg:#291a16;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink); font:15px/1.55 var(--sans); -webkit-text-size-adjust:100%}
+  .wrap{max-width:960px; margin:0 auto; padding:0 20px 90px}
+
+  /* masthead */
+  .masthead{padding:34px 0 20px; border-bottom:1px solid var(--rule-2); margin-bottom:22px}
+  .kicker{font-family:var(--mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.22em; color:var(--signal); margin:0 0 8px}
+  h1{font-family:var(--mono); font-size:2rem; font-weight:600; letter-spacing:-.02em; margin:0}
+  .sub{color:var(--muted); margin:6px 0 0; font-size:.95rem; max-width:60ch}
+
+  /* tabs */
+  .tabs{display:flex; gap:2px; margin:0 0 24px; border-bottom:1px solid var(--rule)}
+  .tab{font-family:var(--mono); font-size:.74rem; text-transform:uppercase; letter-spacing:.1em; font-weight:600;
+    cursor:pointer; border:none; background:none; color:var(--muted); padding:11px 16px;
+    border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s, border-color .15s}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--accent)}
+  .tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  /* cards */
+  .card{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:20px 22px; margin-bottom:18px}
+  .card h2{font-family:var(--mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.14em; color:var(--muted);
+    margin:0 0 18px; font-weight:600}
+
+  /* controls */
+  .row{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end}
+  label{display:flex; flex-direction:column; gap:5px; font-size:.78rem; color:var(--muted)}
+  input[type=date],input[type=number],input[type=text]{
+    font-family:var(--mono); font-size:.9rem; color:var(--ink); background:var(--inset);
+    border:1px solid var(--rule-2); border-radius:5px; padding:8px 10px; font-variant-numeric:tabular-nums}
+  input[type=number]{width:92px}
+  input:focus-visible{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+  .btn{font-family:var(--mono); font-size:.78rem; font-weight:600; letter-spacing:.03em; cursor:pointer;
+    border:1px solid var(--rule-2); background:var(--inset); color:var(--ink); border-radius:5px; padding:9px 14px; transition:border-color .15s}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent); color:var(--surface); border-color:transparent}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  .filestat{font-family:var(--mono); font-size:.8rem; color:var(--muted)}
+
+  /* ledger stat grid */
+  .summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden}
+  .tile{background:var(--surface); padding:15px 16px}
+  .tile .n{font-family:var(--mono); font-size:1.55rem; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1}
+  .tile .k{font-size:.76rem; color:var(--muted); margin-top:4px}
+
+  /* table */
+  .tblwrap{overflow-x:auto}
+  table{border-collapse:collapse; width:100%; min-width:660px; font-variant-numeric:tabular-nums}
+  th,td{text-align:right; padding:10px 12px; border-bottom:1px solid var(--rule); white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-family:var(--mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600}
+  tbody td{font-family:var(--mono); font-size:.9rem}
+  tbody tr{border-left:3px solid transparent}
+  tr.s-good{border-left-color:var(--good)} tr.s-warn{border-left-color:var(--warn)} tr.s-bad{border-left-color:var(--bad)}
+  td input[type=number]{width:78px}
+  .pill{display:inline-block; font-family:var(--mono); padding:2px 7px; border-radius:3px; font-size:.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em}
+  .pill.good{background:var(--good-bg); color:var(--good)} .pill.warn{background:var(--warn-bg); color:var(--warn)} .pill.bad{background:var(--bad-bg); color:var(--bad)}
+  .diff.pos{color:var(--good)} .diff.neg{color:var(--bad)}
+  .muted{color:var(--muted)}
+  tfoot td{font-family:var(--mono); font-weight:600; border-top:2px solid var(--rule-2)}
+  details{margin-top:4px}
+  summary{cursor:pointer; color:var(--muted); font-size:.86rem}
+  .unmatched{margin:8px 0 0; padding-left:0; list-style:none}
+  .unmatched li{font-family:var(--mono); font-size:.84rem; margin:4px 0; padding-left:14px; position:relative}
+  .unmatched li::before{content:"·"; position:absolute; left:2px; color:var(--signal)}
+  .del{color:var(--bad); cursor:pointer; background:none; border:none; font-size:1.15rem; line-height:1; padding:0 2px}
+  .hint{font-size:.84rem; line-height:1.5; color:var(--muted); margin:12px 0 0}
+  .hint b{color:var(--ink); font-weight:600}
+
+  /* budget: now-panel */
+  .hero{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--signal); border-radius:6px; padding:16px 20px; margin-bottom:18px}
+  .hero .lbl{font-family:var(--mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:var(--muted)}
+  .hero .big{font-family:var(--mono); font-size:1.75rem; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; margin-top:2px}
+  .hero .line{font-size:.9rem; color:var(--muted); margin-top:5px}
+
+  /* signature: läsårsband */
+  .yearband{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:18px 20px 14px; margin-bottom:18px}
+  .band{display:flex; gap:6px; height:104px; margin-bottom:10px}
+  .track{position:relative; display:flex; gap:5px; flex:1}
+  .seg{flex-grow:1; flex-basis:0; min-width:12px; display:flex; flex-direction:column; gap:5px}
+  .seg .cap{font-family:var(--mono); font-size:.62rem; line-height:1.2; text-align:center; color:var(--muted); white-space:nowrap; overflow:hidden; height:30px; display:flex; flex-direction:column; justify-content:center}
+  .seg .tube{flex:1; position:relative; background:var(--accent-soft); border-radius:4px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; border:1px solid var(--rule)}
+  .seg .fill{width:100%; background:var(--accent); opacity:.9}
+  .seg.s-good .fill{background:var(--good)} .seg.s-warn .fill{background:var(--warn)} .seg.s-bad .fill{background:var(--bad)}
+  .seg.up .tube{opacity:.55}
+  @media (prefers-reduced-motion:no-preference){ .seg .fill{transition:height .5s ease} }
+  .today{position:absolute; top:0; bottom:0; width:2px; background:var(--signal); z-index:3}
+  .today::before{content:"idag"; position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); font-family:var(--mono); font-size:.58rem; letter-spacing:.05em; color:var(--signal); white-space:nowrap}
+  .summer{flex:0 0 40px; border-radius:4px; margin-top:35px; border:1px solid var(--rule);
+    background:repeating-linear-gradient(-45deg,transparent 0 5px,var(--rule) 5px 6px);
+    display:flex; align-items:center; justify-content:center}
+  .summer span{font-family:var(--mono); font-size:.58rem; color:var(--muted); writing-mode:vertical-rl; text-transform:uppercase; letter-spacing:.1em}
+  .band-cap{font-size:.8rem; color:var(--muted); margin:12px 0 0}
+
+  /* period sheets */
+  .periods{display:grid; grid-template-columns:repeat(auto-fit,minmax(226px,1fr)); gap:14px}
+  .period{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:15px 16px; border-left:3px solid var(--rule-2)}
+  .period.active{border-left-color:var(--signal)}
+  .period.s-good{border-left-color:var(--good)} .period.s-warn{border-left-color:var(--warn)} .period.s-bad{border-left-color:var(--bad)}
+  .period h3{margin:0 0 12px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; gap:8px}
+  .period h3 input{font-weight:600}
+  .period .fields{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px}
+  .period label{font-size:.7rem}
+  .period input{width:100%}
+  .period .target{font-family:var(--mono); font-size:1.5rem; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+  .period .line{font-size:.84rem; color:var(--muted); margin-top:5px}
+  .period .line b{font-family:var(--mono); color:var(--ink); font-weight:600}
+  .acts{margin-top:12px} .acts summary{font-size:.78rem}
+  .actrow{display:grid; grid-template-columns:1fr 60px auto; gap:6px; margin:6px 0; align-items:center}
+  .actrow input[type=number]{width:100%}
+  .acts .btn{margin-top:5px; padding:5px 10px; font-size:.76rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="masthead">
+    <p class="kicker">Ferietjänst · Läsår 26/27</p>
+    <h1>Arbetstid</h1>
+    <p class="sub">Kolla att schemat täcker varje kurs, och håll koll på din reglerade arbetstid över läsåret.</p>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="coverage" aria-selected="true">Täckning per kurs</button>
+    <button class="tab" role="tab" data-view="budget" aria-selected="false">Arbetstidsbudget</button>
+  </div>
+
+  <div class="view" id="view-coverage">
+  <div class="card">
+    <h2>Läsår &amp; schema</h2>
+    <div class="row">
+      <label>Från<input type="date" id="from"></label>
+      <label>Till<input type="date" id="to"></label>
+      <label>&nbsp;<button class="btn primary" id="importBtn">Importera .ics</button></label>
+      <input type="file" id="file" accept=".ics" hidden>
+      <span class="filestat" id="filestat">Inget schema laddat</span>
+    </div>
+    <p class="hint">Exportera din kalender från Outlook (Arkiv → Spara kalender → Fullständig information) och importera .ics-filen. Allt räknas lokalt i din webbläsare — inget skickas någonstans.</p>
+  </div>
+
+  <div class="card">
+    <h2>Sammanfattning</h2>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <div class="card">
+    <h2>Kurser</h2>
+    <div class="tblwrap">
+      <table id="tbl">
+        <thead><tr>
+          <th>Kurs</th><th>Schemalagt</th><th>Tillägg</th><th>Totalt</th><th>Krav</th><th>Diff</th><th>Status</th><th>Not</th><th></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+    <p class="hint"><b>Tillägg</b> = timmar du fyller i själv, t.ex. en termin som inte är schemalagd än, eller kurser (GYARTE, mentorstid) som inte ligger som kalenderhändelser.</p>
+    <button class="btn" id="addCourse" style="margin-top:12px">+ Lägg till kurs</button>
+  </div>
+
+  <div class="card">
+    <details id="unmatchedBox">
+      <summary>Kalenderhändelser som inte matchar någon kurs (<span id="umCount">0</span>)</summary>
+      <ul class="unmatched" id="unmatched"></ul>
+      <p class="hint">Om en kurs döpts om i schemat dyker den upp här. Byt kurskoden ovan så den matchar, eller lägg till den som ny kurs.</p>
+    </details>
+  </div>
+  </div><!-- /view-coverage -->
+
+  <div class="view" id="view-budget" hidden>
+    <div class="yearband" id="yearband"></div>
+
+    <div class="hero">
+      <div class="lbl" id="heroLbl">Just nu</div>
+      <div class="big" id="heroBig">—</div>
+      <div class="line" id="heroLine"></div>
+    </div>
+
+    <div class="card">
+      <h2>Din tid</h2>
+      <div class="row">
+        <label>Tjänstgöring %<input type="number" step="1" id="pct" style="width:80px"></label>
+        <label>Reglerad tid vid 100% (h)<input type="number" step="1" id="reg100" style="width:92px"></label>
+      </div>
+      <div class="summary" id="budgetSummary" style="margin-top:16px"></div>
+      <p class="hint">Reglerad tid = <b id="regShow">–</b> h delas i 4 avstämningsperioder. Förtroendetiden sköter du själv — den visas bara som påminnelse, den ska inte loggas. Undervisningen räknas automatiskt från ditt importerade schema (t.o.m. idag) — du fyller bara i <b>övrigt arbete</b> (planering, rättning, GYARTE, konferens…) som en klumpsumma per period. Jobbar du ihop dig på hösten? Lägg fler måltimmar på höstperioderna och färre på APL-perioden — <b>mot plan i år</b> visar hur många timmar du bankat att ta av när eleverna är på APL.</p>
+    </div>
+
+    <div class="card">
+      <h2>Avstämningsperioder</h2>
+      <div class="periods" id="periods"></div>
+      <p class="hint" id="periodSumHint"></p>
+    </div>
+  </div><!-- /view-budget -->
+</div>
+
+<script>
+const KEY = "arbetstid-tackning-v2";
+const DEFAULTS = {
+  from:"2026-08-01", to:"2027-06-30",
+  fileName:"",
+  events:[], // {summary, start(iso), hours}
+  courses:[
+    {code:"FROT100TX", required:72, manual:0, note:"APL-paus vår ~v8→terminsslut"},
+    {code:"FROT200TX", required:72, manual:0, note:"APL-paus vår ~v8→terminsslut — bevaka"},
+    {code:"DIGD100TX", required:54, manual:0, note:"APL-paus vår ~v8→terminsslut — bevaka"},
+    {code:"WEUWEB02",  required:86, manual:0, note:""},
+    {code:"WEBB",      required:86, manual:0, note:""},
+    {code:"ARTI1000X", required:40, manual:0, note:"Delad kurs, varannan vecka, helår"},
+    {code:"GYARTE",    required:30, manual:0, note:"Ligger ej i kalendern — fyll i manuellt"},
+    {code:"Studiepass",required:30, manual:0, note:"Varje vecka hela läsåret (krav = golv)"},
+    {code:"Mentorstid",required:18, manual:0, note:"APL-paus vår; ligger sällan i kalendern"},
+  ],
+  budget:{
+    pct:80, reg100:1360, arstid100:1767,
+    periods:[
+      {label:"Period 1", start:"2026-08-11", end:"2026-10-31", weeks:11, hours:272, logged:0, activities:[]},
+      {label:"Period 2", start:"2026-11-01", end:"2027-01-15", weeks:9,  hours:272, logged:0, activities:[]},
+      {label:"Period 3", start:"2027-01-16", end:"2027-03-31", weeks:10, hours:272, logged:0, activities:[
+        {name:"Gymnasiearbete – handledning", hours:0},
+        {name:"UF", hours:0},{name:"Blixtlåset", hours:0},
+        {name:"Tävlingar (lokala)", hours:0},{name:"Övrigt", hours:0}]},
+      {label:"Period 4", start:"2027-04-01", end:"2027-06-12", weeks:9,  hours:272, logged:0, activities:[
+        {name:"Rättning & bedömning", hours:0},
+        {name:"Betygsinmatning & omdömen", hours:0},
+        {name:"Gymnasiearbete – bedömning", hours:0},{name:"Övrigt", hours:0}]},
+    ]
+  }
+};
+let state = load();
+
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(KEY));
+    if(s&&s.courses){
+      const b = s.budget || structuredClone(DEFAULTS.budget);
+      if(b.periods) b.periods.forEach((p,i)=>{ if(!p.activities) p.activities = structuredClone((DEFAULTS.budget.periods[i]||{}).activities||[]); });
+      return {...structuredClone(DEFAULTS), ...s, budget:b};
+    }
+  }catch(e){}
+  return structuredClone(DEFAULTS);
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+
+// ---- .ics parsing ----
+function parseICS(text){
+  text = text.replace(/\r\n/g,"\n").replace(/\n[ \t]/g,""); // unfold
+  const out=[];
+  let cur=null;
+  for(const line of text.split("\n")){
+    if(line==="BEGIN:VEVENT"){ cur={}; continue; }
+    if(line==="END:VEVENT"){ if(cur&&cur.start&&cur.end){
+        const h=(cur.end-cur.start)/3.6e6;
+        if(h>0&&h<24) out.push({summary:(cur.summary||"").trim(), start:cur.start.toISOString(), hours:h});
+      } cur=null; continue; }
+    if(!cur) continue;
+    const i=line.indexOf(":"); if(i<0) continue;
+    const name=line.slice(0,i).split(";")[0], val=line.slice(i+1);
+    if(name==="SUMMARY") cur.summary=val;
+    else if(name==="DTSTART") cur.start=dt(val);
+    else if(name==="DTEND") cur.end=dt(val);
+  }
+  return out;
+}
+function dt(v){
+  const m=v.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/);
+  if(!m) return null;
+  return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]); // treat as local wall-clock
+}
+
+// ---- compute + render ----
+function norm(s){ return s.toLowerCase().trim(); }
+function compute(){
+  const from=new Date(state.from+"T00:00:00"), to=new Date(state.to+"T23:59:59");
+  const inWin = state.events.filter(e=>{ const d=new Date(e.start); return d>=from && d<=to; });
+  const codes = new Set(state.courses.map(c=>norm(c.code)));
+  const perCode = {};
+  const unmatched = {};
+  for(const e of inWin){
+    const k=norm(e.summary);
+    if(codes.has(k)) perCode[k]=(perCode[k]||0)+e.hours;
+    else if(e.summary) unmatched[e.summary]=(unmatched[e.summary]||0)+e.hours;
+  }
+  return {perCode, unmatched};
+}
+
+function render(){
+  document.getElementById("from").value=state.from;
+  document.getElementById("to").value=state.to;
+  document.getElementById("filestat").textContent =
+    state.events.length ? `${state.fileName||"schema"} — ${state.events.length} händelser` : "Inget schema laddat";
+
+  const {perCode, unmatched} = compute();
+  const rows=document.getElementById("rows"); rows.innerHTML="";
+  let tSched=0,tTot=0,tReq=0;
+
+  state.courses.forEach((c,idx)=>{
+    const sched = perCode[norm(c.code)]||0;
+    const man = +c.manual||0;
+    const req = +c.required||0;
+    const tot = sched+man;
+    const diff = tot - req;
+    const st = diff>=0 ? "good" : diff> -Math.max(4,req*0.1) ? "warn" : "bad";
+    const label = {good:"Täckt", warn:"Nära", bad:"Underskott"}[st];
+    tSched+=sched; tTot+=tot; tReq+=req;
+    const tr=document.createElement("tr"); tr.className="s-"+st;
+    tr.innerHTML =
+      `<td class="code"><input type="text" value="${esc(c.code)}" data-i="${idx}" data-f="code" style="width:120px"></td>
+       <td>${sched.toFixed(1)}</td>
+       <td><input type="number" step="0.5" value="${man}" data-i="${idx}" data-f="manual"></td>
+       <td>${tot.toFixed(1)}</td>
+       <td><input type="number" step="1" value="${req}" data-i="${idx}" data-f="required"></td>
+       <td class="diff ${diff>=0?'pos':'neg'}">${diff>=0?'+':''}${diff.toFixed(1)}</td>
+       <td><span class="pill ${st}">${label}</span></td>
+       <td><input type="text" value="${esc(c.note||'')}" data-i="${idx}" data-f="note" placeholder="—" style="width:190px"></td>
+       <td><button class="del" data-del="${idx}" title="Ta bort">×</button></td>`;
+    rows.appendChild(tr);
+  });
+
+  document.getElementById("foot").innerHTML = state.courses.length ?
+    `<tr><td>Summa</td><td>${tSched.toFixed(1)}</td><td></td><td>${tTot.toFixed(1)}</td><td>${tReq.toFixed(1)}</td>
+     <td class="diff ${tTot-tReq>=0?'pos':'neg'}">${tTot-tReq>=0?'+':''}${(tTot-tReq).toFixed(1)}</td><td></td><td></td><td></td></tr>` : "";
+
+  // summary tiles
+  const covered = state.courses.filter(c=>((perCode[norm(c.code)]||0)+ (+c.manual||0)) >= c.required).length;
+  document.getElementById("summary").innerHTML =
+    tile(state.events.length? (tSched.toFixed(0)+" h") : "—", "schemalagt i läsåret") +
+    tile(tReq.toFixed(0)+" h", "krav enligt tjänstefördelning") +
+    tile(`${covered} / ${state.courses.length}`, "kurser täckta") +
+    tile(((tTot-tReq)>=0?'+':'')+(tTot-tReq).toFixed(0)+" h", "totalt över/underskott");
+
+  // unmatched
+  const um=Object.entries(unmatched).sort((a,b)=>b[1]-a[1]);
+  document.getElementById("umCount").textContent=um.length;
+  document.getElementById("unmatched").innerHTML =
+    um.length ? um.map(([s,h])=>`<li>${esc(s)} — <span class="muted">${h.toFixed(1)} h</span></li>`).join("")
+              : `<li class="muted">Inga — alla händelser matchar en kurs eller så är inget schema laddat.</li>`;
+}
+function tile(n,k){ return `<div class="tile"><div class="n">${n}</div><div class="k">${k}</div></div>`; }
+function esc(s){ return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+
+// ---- events ----
+document.getElementById("importBtn").onclick=()=>document.getElementById("file").click();
+document.getElementById("file").onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ state.events=parseICS(r.result); state.fileName=f.name; save(); render(); renderBudget(); };
+  r.readAsText(f);
+};
+document.getElementById("from").onchange=e=>{ state.from=e.target.value; save(); render(); };
+document.getElementById("to").onchange=e=>{ state.to=e.target.value; save(); render(); };
+document.getElementById("rows").addEventListener("input",e=>{
+  const t=e.target, i=t.dataset.i, f=t.dataset.f; if(i==null) return;
+  state.courses[i][f] = t.value;
+  save();
+  if(f==="manual"||f==="required") render(); // numeric changes recompute; code/note keep focus
+});
+document.getElementById("rows").addEventListener("change",e=>{ if(e.target.dataset.f==="code") render(); });
+document.getElementById("rows").addEventListener("click",e=>{
+  const d=e.target.dataset.del; if(d==null) return;
+  state.courses.splice(+d,1); save(); render();
+});
+document.getElementById("addCourse").onclick=()=>{ state.courses.push({code:"NY",required:0,manual:0,note:""}); save(); render(); };
+
+// ---- budget module ----
+function fmt(n){ return (Math.round(n*10)/10).toFixed(1); }
+function renderBudget(){
+  const b=state.budget;
+  document.getElementById("pct").value=b.pct;
+  document.getElementById("reg100").value=b.reg100;
+  const pct=(+b.pct||0)/100;
+  const reglerad=(+b.reg100||0)*pct;
+  const fortroende=((+b.arstid100||0)-(+b.reg100||0))*pct;
+  document.getElementById("regShow").textContent=Math.round(reglerad);
+
+  const now=new Date();
+  const courseCodes=new Set(state.courses.map(c=>norm(c.code)));
+  const cont=document.getElementById("periods"); cont.innerHTML="";
+  const segs=[];
+  let sumHours=0, sumLogged=0, sumExpected=0, active=null;
+  b.periods.forEach((p,idx)=>{
+    const weeks=+p.weeks||0, hours=+p.hours||0, manual=+p.logged||0;
+    const acts=p.activities||[];
+    const estSum=acts.reduce((sum,a)=>sum+(+a.hours||0),0);
+    const s=new Date(p.start+"T00:00:00"), e=new Date(p.end+"T23:59:59"), span=e-s;
+    const cut=Math.min(now.getTime(), e.getTime());  // "hittills" = t.o.m. idag, dock ej förbi periodens slut
+    let auto=0;
+    for(const ev of state.events){ const d=new Date(ev.start).getTime();
+      if(d>=s.getTime() && d<=cut && courseCodes.has(norm(ev.summary))) auto+=ev.hours; }
+    const logged=auto+manual;
+    sumHours+=hours; sumLogged+=logged;
+    let frac = span>0 ? (now-s)/span : 0; frac=Math.max(0,Math.min(1,frac));
+    const started=now>=s, ended=now>e;
+    const perWeek = weeks? hours/weeks : 0;
+    const balance = logged - hours*frac;
+    sumExpected += hours*frac;
+    const remH = hours-logged;
+    const remWeeks = ended?0: weeks*(1-frac);
+    const pace = (remH>0 && remWeeks>0)? remH/remWeeks : 0;
+
+    let st="", label="Kommande";
+    if(ended){ const ok=logged>=hours-0.5; st=ok?"good":"bad"; label=ok?"Klar":"Underskott"; }
+    else if(started){ active={p,perWeek,pace,remH,balance};
+      st = balance>=0?"good": balance> -0.1*hours?"warn":"bad";
+      label = balance>=0?"I fas": balance> -0.1*hours?"Något efter":"Efter plan";
+    }
+    segs.push({label:p.label, start:s, end:e, days:Math.max(Math.round(span/8.64e7),1),
+      fillPct: hours>0? Math.max(0,Math.min(1,logged/hours))*100 : 0, st, started, perWeek});
+
+    const div=document.createElement("div");
+    div.className="period"+(started&&!ended?" active":"")+(st?" s-"+st:"");
+    div.innerHTML=
+      `<h3><input type="text" value="${esc(p.label)}" data-p="${idx}" data-f="label" style="width:52%">
+         <span class="pill ${st}">${label}</span></h3>
+       <div class="fields">
+         <label>Från<input type="date" value="${p.start}" data-p="${idx}" data-f="start"></label>
+         <label>Till<input type="date" value="${p.end}" data-p="${idx}" data-f="end"></label>
+         <label>Arbetsveckor<input type="number" step="1" value="${weeks}" data-p="${idx}" data-f="weeks"></label>
+         <label>Måltimmar<input type="number" step="1" value="${hours}" data-p="${idx}" data-f="hours"></label>
+       </div>
+       <div class="target">${fmt(perWeek)} h/vecka</div>
+       <div class="line">mål för perioden</div>
+       <div class="line" style="margin-top:8px">Undervisning (auto): <b>${fmt(auto)} h</b></div>
+       <div class="fields" style="margin-top:4px;grid-template-columns:1fr">
+         <label>Övrigt arbete hittills (h)<input type="number" step="0.5" value="${manual}" data-p="${idx}" data-f="logged"></label>
+       </div>
+       <div class="line">Loggat totalt: <b>${fmt(logged)} h</b> · Kvar: <b>${fmt(remH)} h</b></div>
+       ${started&&!ended ? `<div class="line">Ligger <b>${balance>=0?'+':''}${fmt(balance)} h</b> mot plan</div>
+         <div class="line">Klara resten: <b>${fmt(pace)} h/vecka</b> i ${fmt(remWeeks)} v</div>` : ""}
+       <details class="acts"${acts.length?" open":""}>
+         <summary>Innehåll — uppskattat <b>${fmt(estSum)} h</b>${Math.abs(estSum-hours)>=1&&acts.length?` (mål ${fmt(hours)} h)`:""}</summary>
+         ${acts.map((a,ai)=>`<div class="actrow">
+            <input type="text" value="${esc(a.name)}" data-p="${idx}" data-ai="${ai}" data-af="name" placeholder="uppgift">
+            <input type="number" step="0.5" value="${+a.hours||0}" data-p="${idx}" data-ai="${ai}" data-af="hours">
+            <button class="del" data-p="${idx}" data-delact="${ai}" title="Ta bort">×</button>
+          </div>`).join("")}
+         <button class="btn" data-p="${idx}" data-addact="1">+ uppgift</button>
+       </details>`;
+    cont.appendChild(div);
+  });
+
+  renderYearband(segs, now);
+
+  const hb=document.getElementById("heroBig"), hl=document.getElementById("heroLbl"), hln=document.getElementById("heroLine");
+  if(active){
+    hl.textContent=`Just nu — ${active.p.label}`;
+    hb.textContent=`Sikta på ${fmt(active.perWeek)} h/vecka`;
+    hln.textContent = active.balance>=0
+      ? `Du ligger ${fmt(active.balance)} h före plan.${active.remH>0?` Klara perioden med ${fmt(active.pace)} h/vecka.`:''}`
+      : `Du ligger ${fmt(-active.balance)} h efter. Ta igen med ${fmt(active.pace)} h/vecka resten av perioden.`;
+  } else {
+    hl.textContent="Just nu"; hb.textContent="Ingen aktiv period";
+    hln.textContent="Dagens datum ligger utanför perioderna — justera datumen så de täcker läsåret.";
+  }
+
+  const yearBal = sumLogged - sumExpected;
+  document.getElementById("budgetSummary").innerHTML=
+    tile(Math.round(reglerad)+" h","reglerad tid i år") +
+    tile(fmt(sumLogged)+" h","loggat hittills") +
+    tile(fmt(reglerad-sumLogged)+" h","kvar av reglerad tid") +
+    tile((yearBal>=0?'+':'')+fmt(yearBal)+" h","mot plan i år (+ = bankat)") +
+    tile(Math.round(fortroende)+" h","förtroendetid (egen)");
+
+  const diff=sumHours-reglerad;
+  document.getElementById("periodSumHint").textContent =
+    Math.abs(diff)<1 ? `Perioderna summerar till ${fmt(sumHours)} h = din reglerade tid.`
+      : `Perioderna summerar till ${fmt(sumHours)} h, men reglerad tid är ${Math.round(reglerad)} h (${diff>0?'+':''}${fmt(diff)} h). Justera måltimmarna.`;
+}
+
+function renderYearband(segs, now){
+  const el=document.getElementById("yearband");
+  if(!segs.length){ el.innerHTML=""; return; }
+  const start0=segs[0].start, endL=segs[segs.length-1].end, totalSpan=endL-start0;
+  const before=now<start0, after=now>endL;
+  const todayFrac=Math.max(0,Math.min(1, totalSpan>0? (now-start0)/totalSpan : 0));
+  const track = segs.map(s=>{
+    const cls = s.st? "s-"+s.st : (s.started? "" : "up");
+    return `<div class="seg ${cls}" style="flex-grow:${s.days}">
+       <div class="cap">${esc(s.label)}<br>${fmt(s.perWeek)} h/v</div>
+       <div class="tube"><div class="fill" style="height:${s.fillPct.toFixed(1)}%"></div></div>
+     </div>`;
+  }).join("");
+  const todayLine = (before||after)? "" : `<div class="today" style="left:${(todayFrac*100).toFixed(2)}%"></div>`;
+  const note = before? "Läsåret har inte börjat än." : after? "Läsåret är slut."
+    : "Rören fylls när du loggar tid. Den lodräta linjen är idag.";
+  el.innerHTML =
+    `<div class="band"><div class="track">${track}${todayLine}</div>
+       <div class="summer"><span>sommar</span></div></div>
+     <p class="band-cap">${note} Sista fältet är sommaren.</p>`;
+}
+
+document.getElementById("pct").addEventListener("change",e=>{ state.budget.pct=e.target.value; save(); renderBudget(); });
+document.getElementById("reg100").addEventListener("change",e=>{ state.budget.reg100=e.target.value; save(); renderBudget(); });
+document.getElementById("periods").addEventListener("change",e=>{
+  const t=e.target, p=t.dataset.p; if(p==null) return;
+  if(t.dataset.af!=null){ (state.budget.periods[p].activities ||= [])[t.dataset.ai][t.dataset.af]=t.value; }
+  else if(t.dataset.f!=null){ state.budget.periods[p][t.dataset.f]=t.value; }
+  else return;
+  save(); renderBudget();
+});
+document.getElementById("periods").addEventListener("click",e=>{
+  const t=e.target, p=t.dataset.p; if(p==null) return;
+  const per=state.budget.periods[p]; per.activities ||= [];
+  if(t.dataset.addact!=null){ per.activities.push({name:"",hours:0}); save(); renderBudget(); }
+  else if(t.dataset.delact!=null){ per.activities.splice(+t.dataset.delact,1); save(); renderBudget(); }
+});
+document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", x===btn));
+  document.getElementById("view-coverage").hidden = btn.dataset.view!=="coverage";
+  document.getElementById("view-budget").hidden = btn.dataset.view!=="budget";
+  if(btn.dataset.view==="budget") renderBudget();
+}));
+
+// ---- self-test (console) ----
+(function(){
+  const sample="BEGIN:VEVENT\nSUMMARY:TEST01\nDTSTART;TZID=x:20260901T080000\nDTEND;TZID=x:20260901T100000\nEND:VEVENT\n"+
+               "BEGIN:VEVENT\nSUMMARY:TEST01\nDTSTART:20270201T090000\nDTEND:20270201T093000\nEND:VEVENT";
+  const ev=parseICS(sample);
+  console.assert(ev.length===2 && Math.abs(ev[0].hours-2)<1e-9 && Math.abs(ev[1].hours-0.5)<1e-9, "parseICS self-test FAILED", ev);
+  const perWeek=272/8, balance=100-272*0.5;
+  console.assert(Math.abs(perWeek-34)<1e-9 && Math.abs(balance+36)<1e-9, "budget self-test FAILED", perWeek, balance);
+})();
+
+render();
+renderBudget();
+</script>
+</body>
+</html>
