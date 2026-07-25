@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="sv">
 <head>
 <meta charset="utf-8">
@@ -6,6 +6,11 @@
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Privat verktyg för ferietjänst: kontrollera att schemat täcker varje kurs, och följ reglerad arbetstid över läsårets fyra avstämningsperioder.">
 <meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#eaeeea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f130f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Arbetstid — logg &amp; täckning</title>
 <style>
   :root{
@@ -702,6 +707,18 @@ document.querySelector(".tabs").addEventListener("keydown",e=>{
 
 render();
 renderBudget();
+</script>
+
+<script>
+// Service worker kräver secure context (https eller localhost). Öppnad direkt
+// från disk (file://) hoppas registreringen över — appen fungerar ändå, den
+// behöver bara nätet för att kunna installeras och köras offline.
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js")
+      .catch(err => console.warn("Service worker ej registrerad:", err));
+  });
+}
 </script>
 </body>
 </html>
