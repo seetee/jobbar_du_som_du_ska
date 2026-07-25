@@ -34,6 +34,23 @@ reglerad ≈ **1088 h**, förtroende ≈ **326 h**.
   palette, and the signature **läsårsband** (period tubes that fill with logged
   hours, live "idag" line, hatched sommar cap).
 
+## Lov (added 2026-07-25)
+
+Arbetsveckor are no longer typed per period — one year-level **Lovveckor** field
+(`33,34,44,53,7,15,25`) drives both the h/vecka target and the plan line. This
+also fixed a unit bug: `frac` was elapsed *calendar* time while `weeks` was
+arbetsveckor, so the plan advanced during lov and reported a phantom deficit
+every jullov. Plan now advances only in working weeks.
+
+The `.ics` contains **no** lov or all-day events — lov is only inferable from
+weeks with zero lessons (25/26 gaps: v33–34, v44, v52–01, v07, v15, v25). Hence
+a typed list rather than derivation: P3/P4 have no VT27 schedule yet, so
+derivation would read them as all-lov. A "hitta lov från schemat" button that
+*fills* the field is the upgrade path if typing it once a year gets old.
+
+Known ceiling: a week straddling a period boundary counts fully in both periods.
+Put boundaries on week edges (Sun→Mon) and it disappears.
+
 ## Kenneth's specifics (baked into defaults)
 
 - Front-loads teaching into autumn; spring APL period is not *light* but full of
@@ -43,16 +60,26 @@ reglerad ≈ **1088 h**, förtroende ≈ **326 h**.
   January, then most of spring lost to the 12-week APL pause. Confirm once the
   VT27 schedule exists.
 - `GYARTE` and `Mentorstid` aren't reliable calendar events → manual entry.
-- Skola24 has no usable export; M365 connector is blocked by the tenant. Route is
-  Outlook → Save Calendar → `.ics`.
+- M365 connector is blocked by the tenant. Route is Outlook → Save Calendar →
+  `.ics`. Skola24 support (2026-07-25) confirms iCal export *can* be enabled in
+  Schemavisaren, but it is **static** (never reflects later schedule changes) and
+  yields **one file per week** — ~40 files per läsår, one "calendar" each in
+  Outlook. Worse than the Outlook export on both counts, and the staleness defeats
+  the whole point of the coverage check, so Outlook stays the source.
 
 ## Tomorrow / open
 
 - [ ] Publish as a private Claude Artifact → phone home-screen URL; visually
       verify the läsårsband alignment (couldn't screenshot locally).
-- [ ] Enter real numbers: employment %, real period boundaries (carve out lov via
-      arbetsveckor), måltimmar weighted for front-loading.
-- [ ] Import the real autumn `.ics`; sanity-check FROT200 / DIGD coverage.
+- [ ] Enter real numbers: employment % (~81, not 80), real period boundaries on
+      week edges, correct lovveckor from kalendariet, måltimmar weighted for
+      front-loading.
+- [ ] Import the autumn `.ics` — **already in `docs/calendar.ics`**, which spans
+      2025-08-11 → 2027-01-19 (all of 25/26 plus HT26). Sanity-check FROT200 /
+      DIGD coverage.
+- [ ] Course aliases: `WEUWEB01`→`WEBB Nivå 1` (25/26 only, course retired),
+      `ARTART01`→`ARTI1000X`, and `WEUWEB02`→`WEBB Nivå 2` from 27/28. Needed
+      only if the 25/26 year should compute; harmless in a 26/27 window.
 - [ ] Import VT27 `.ics` when it lands (replaces the spring projection).
 - [ ] Decide if a real offline PWA (manifest + service worker) is worth it, or if
       the Artifact URL is enough.
