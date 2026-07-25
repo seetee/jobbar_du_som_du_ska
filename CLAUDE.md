@@ -24,6 +24,22 @@ There is no build, no package manager, no test runner, no backend.
   every page load and logs to the console. Extend that IIFE rather than adding a
   framework. Note `index.html` has **two** script blocks now (app, then service
   worker registration) — take the longest when extracting for `node --check`.
+- Validating markup: `npx html-validate index.html`. The Nu validator (`vnu.jar`)
+  needs Java 11+ and this machine has 8 — `vnu-jar@17.11.0` runs on 8 but is from
+  2022 and reports stale complaints (`media` on `theme-color`, `type=date` and
+  `inputmode` "not supported in all browsers"); all four are fine today. Most of
+  the markup is generated, so validate the **rendered DOM** too: run the page in
+  jsdom (needs a `structuredClone` shim) and validate the serialized output.
+
+## Accessibility
+
+Non-negotiable, and worth stating because it has already been got wrong once: date
+fields are native `<input type="date">`. Display format is decided by the OS/browser
+locale, not by the page, so a "wrong" format is never a reason to reach for a text
+input — that discards the picker, keyboard stepping and date semantics AT depends
+on. Same principle throughout: keep native controls, and if ARIA roles are added,
+wire the whole pattern (the tabs once had `role="tab"` and nothing else, which is
+worse than no ARIA at all).
 
 ## Architecture
 
