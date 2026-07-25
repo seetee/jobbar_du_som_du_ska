@@ -1,2 +1,5 @@
 # Personal source data — schedule, tjänstefördelning, employer slides. Never commit.
 docs/
+
+# Machine-local tool permissions, not project config.
+.claude/settings.local.json
