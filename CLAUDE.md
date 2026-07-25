@@ -14,16 +14,28 @@ it updated when shipping something from its list.
 
 There is no build, no package manager, no test runner, no backend.
 
-- Run: open `index.html` in a browser (`xdg-open index.html`). Works from `file://`.
-- Tests: an `assert`-based self-test at the bottom of the `<script>` runs on every
-  page load and logs to the console (`parseICS` durations + budget arithmetic).
-  Extend that IIFE rather than adding a framework. Syntax check without a browser:
-  extract the script and run `node --check`.
+- Quick look: open `index.html` directly (`xdg-open index.html`). The app works
+  fully from `file://`, but the service worker will not register there.
+- Anything PWA-related **must** be served, since service workers require a secure
+  context: `python3 -m http.server 8765` then `http://127.0.0.1:8765/`. Verify
+  install/precache from the server's access log — `GET /index.html` and the icons
+  appear only when `cache.addAll(SHELL)` runs, since the page never requests them.
+- Tests: an `assert`-based self-test at the bottom of the app `<script>` runs on
+  every page load and logs to the console. Extend that IIFE rather than adding a
+  framework. Note `index.html` has **two** script blocks now (app, then service
+  worker registration) — take the longest when extracting for `node --check`.
 
 ## Architecture
 
-Everything lives in `index.html` — vanilla JS, no modules, `localStorage`
-persistence, offline-capable. UI strings are Swedish; keep them Swedish.
+Four tracked parts: `index.html` (all markup, CSS and app logic — vanilla JS, no
+modules, `localStorage`), `manifest.webmanifest`, `sw.js`, and `icons/`. It stopped
+being a single self-contained file when it became a PWA: a service worker must be
+its own file at the right scope, and a manifest cannot be inlined reliably. UI
+strings are Swedish; keep them Swedish.
+
+`sw.js` is network-first with cache fallback, deliberately: there is no build step
+and no versioned filenames, so cache-first would serve stale code indefinitely.
+Bump `CACHE` whenever `SHELL` changes — `activate` deletes every other cache.
 
 State: one `state` object, seeded from `DEFAULTS`, persisted under the `KEY`
 constant. `load()` shallow-merges saved state over a `structuredClone(DEFAULTS)`
