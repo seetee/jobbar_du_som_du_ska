@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arbetstid — logg & täckning</title>
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Privat verktyg för ferietjänst: kontrollera att schemat täcker varje kurs, och följ reglerad arbetstid över läsårets fyra avstämningsperioder.">
+<meta name="robots" content="noindex, nofollow">
+<title>Arbetstid — logg &amp; täckning</title>
 <style>
   :root{
     --mono: ui-monospace,"SFMono-Regular","Cascadia Code",Menlo,Consolas,"Liberation Mono",monospace;
@@ -42,7 +45,14 @@
   }
   *{box-sizing:border-box}
   body{margin:0; background:var(--paper); color:var(--ink); font:15px/1.55 var(--sans); -webkit-text-size-adjust:100%}
-  .wrap{max-width:960px; margin:0 auto; padding:0 20px 90px}
+  .wrap{display:block; max-width:960px; margin:0 auto; padding:0 20px 90px}
+
+  /* Endast för skärmläsare: text som förklarar visuella element (staplar, ikonknappar). */
+  .sr-only{position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+    clip-path:inset(50%); white-space:nowrap; border:0}
+  /* Listor som är listor semantiskt men rutnät visuellt. */
+  .periods,.segs,.actlist,.unmatched{list-style:none; margin:0; padding:0}
+  figure{margin:0}
 
   /* masthead */
   .masthead{padding:34px 0 20px; border-bottom:1px solid var(--rule-2); margin-bottom:22px}
@@ -71,6 +81,9 @@
     font-family:var(--mono); font-size:.9rem; color:var(--ink); background:var(--inset);
     border:1px solid var(--rule-2); border-radius:5px; padding:8px 10px; font-variant-numeric:tabular-nums}
   input[type=number]{width:92px}
+  /* Native datumfält: visningsformatet kommer från OS/webbläsarens locale (sv-SE ⇒ ISO).
+     min-width:0 behövs bara för att fältet ska kunna krympa i rutnätet i periodkorten. */
+  input.date{min-width:0}
   input:focus-visible{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
   .btn{font-family:var(--mono); font-size:.78rem; font-weight:600; letter-spacing:.03em; cursor:pointer;
     border:1px solid var(--rule-2); background:var(--inset); color:var(--ink); border-radius:5px; padding:9px 14px; transition:border-color .15s}
@@ -80,10 +93,14 @@
   .btn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .filestat{font-family:var(--mono); font-size:.8rem; color:var(--muted)}
 
-  /* ledger stat grid */
-  .summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden}
-  .tile{background:var(--surface); padding:15px 16px}
-  .tile .n{font-family:var(--mono); font-size:1.55rem; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1}
+  /* ledger stat grid — <dl>: dt = vad det är, dd = värdet.
+     column-reverse gör att värdet visas överst fast dt måste komma först i källan. */
+  .summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:6px; overflow:hidden; margin:0}
+  #budgetSummary{margin-top:16px}
+  /* justify-content:flex-end = mot toppen när riktningen är omvänd; annars trycks
+     värdet uppåt i rutor vars etikett radbryts och siffrorna tappar gemensam linje. */
+  .tile{display:flex; flex-direction:column-reverse; justify-content:flex-end; background:var(--surface); padding:15px 16px}
+  .tile .n{margin:0; font-family:var(--mono); font-size:1.55rem; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em; line-height:1.1}
   .tile .k{font-size:.76rem; color:var(--muted); margin-top:4px}
 
   /* table */
@@ -92,36 +109,44 @@
   th,td{text-align:right; padding:10px 12px; border-bottom:1px solid var(--rule); white-space:nowrap}
   th:first-child,td:first-child{text-align:left}
   thead th{font-family:var(--mono); font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600}
-  tbody td{font-family:var(--mono); font-size:.9rem}
+  tbody td,tbody th{font-family:var(--mono); font-size:.9rem}
+  tbody th{font-weight:400} /* radrubriken är kurskoden — inte visuellt fet, men th för skärmläsare */
   tbody tr{border-left:3px solid transparent}
   tr.s-good{border-left-color:var(--good)} tr.s-warn{border-left-color:var(--warn)} tr.s-bad{border-left-color:var(--bad)}
   td input[type=number]{width:78px}
+  .in-code{width:120px} .in-note{width:190px}
+  .card > .btn{margin-top:12px}
+  #pct{width:80px} #reg100{width:92px} #lov{width:220px}
   .pill{display:inline-block; font-family:var(--mono); padding:2px 7px; border-radius:3px; font-size:.66rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em}
   .pill.good{background:var(--good-bg); color:var(--good)} .pill.warn{background:var(--warn-bg); color:var(--warn)} .pill.bad{background:var(--bad-bg); color:var(--bad)}
   .diff.pos{color:var(--good)} .diff.neg{color:var(--bad)}
   .muted{color:var(--muted)}
-  tfoot td{font-family:var(--mono); font-weight:600; border-top:2px solid var(--rule-2)}
+  tfoot td,tfoot th{font-family:var(--mono); font-weight:600; border-top:2px solid var(--rule-2)}
   details{margin-top:4px}
   summary{cursor:pointer; color:var(--muted); font-size:.86rem}
-  .unmatched{margin:8px 0 0; padding-left:0; list-style:none}
+  .unmatched{margin:8px 0 0}
   .unmatched li{font-family:var(--mono); font-size:.84rem; margin:4px 0; padding-left:14px; position:relative}
   .unmatched li::before{content:"·"; position:absolute; left:2px; color:var(--signal)}
   .del{color:var(--bad); cursor:pointer; background:none; border:none; font-size:1.15rem; line-height:1; padding:0 2px}
+  .del:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
   .hint{font-size:.84rem; line-height:1.5; color:var(--muted); margin:12px 0 0}
-  .hint b{color:var(--ink); font-weight:600}
+  .hint strong{color:var(--ink); font-weight:600}
 
   /* budget: now-panel */
   .hero{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--signal); border-radius:6px; padding:16px 20px; margin-bottom:18px}
-  .hero .lbl{font-family:var(--mono); font-size:.7rem; text-transform:uppercase; letter-spacing:.12em; color:var(--muted)}
-  .hero .big{font-family:var(--mono); font-size:1.75rem; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; margin-top:2px}
-  .hero .line{font-size:.9rem; color:var(--muted); margin-top:5px}
+  /* h2/p har UA-marginaler som de gamla div:arna saknade — nollställ dem här. */
+  .hero .lbl{margin:0; font-family:var(--mono); font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.12em; color:var(--muted)}
+  .hero .big{margin:2px 0 0; font-family:var(--mono); font-size:1.75rem; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+  .hero .line{margin:5px 0 0; font-size:.9rem; color:var(--muted)}
 
   /* signature: läsårsband */
   .yearband{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:18px 20px 14px; margin-bottom:18px}
   .band{display:flex; gap:6px; height:104px; margin-bottom:10px}
-  .track{position:relative; display:flex; gap:5px; flex:1}
+  /* .track är bara positioneringskontext för idag-linjen — <ol> håller perioderna. */
+  .track{position:relative; display:flex; flex:1}
+  .segs{display:flex; gap:5px; flex:1}
   .seg{flex-grow:1; flex-basis:0; min-width:12px; display:flex; flex-direction:column; gap:5px}
-  .seg .cap{font-family:var(--mono); font-size:.62rem; line-height:1.2; text-align:center; color:var(--muted); white-space:nowrap; overflow:hidden; height:30px; display:flex; flex-direction:column; justify-content:center}
+  .seg .cap{margin:0; font-family:var(--mono); font-size:.62rem; line-height:1.2; text-align:center; color:var(--muted); white-space:nowrap; overflow:hidden; height:30px; display:flex; flex-direction:column; justify-content:center}
   .seg .tube{flex:1; position:relative; background:var(--accent-soft); border-radius:4px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; border:1px solid var(--rule)}
   .seg .fill{width:100%; background:var(--accent); opacity:.9}
   .seg.s-good .fill{background:var(--good)} .seg.s-warn .fill{background:var(--warn)} .seg.s-bad .fill{background:var(--bad)}
@@ -136,18 +161,25 @@
   .band-cap{font-size:.8rem; color:var(--muted); margin:12px 0 0}
 
   /* period sheets */
-  .periods{display:grid; grid-template-columns:repeat(auto-fit,minmax(226px,1fr)); gap:14px}
+  /* 264px = två datumfält (2×~108px) + gap + kortets padding/ram. Under det bryts fälten till en kolumn. */
+  .periods{display:grid; grid-template-columns:repeat(auto-fit,minmax(264px,1fr)); gap:14px}
   .period{background:var(--surface); border:1px solid var(--rule); border-radius:6px; padding:15px 16px; border-left:3px solid var(--rule-2)}
   .period.active{border-left-color:var(--signal)}
   .period.s-good{border-left-color:var(--good)} .period.s-warn{border-left-color:var(--warn)} .period.s-bad{border-left-color:var(--bad)}
-  .period h3{margin:0 0 12px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; gap:8px}
-  .period h3 input{font-weight:600}
-  .period .fields{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px}
-  .period label{font-size:.7rem}
-  .period input{width:100%}
+  .period .phead{margin:0 0 12px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; gap:8px}
+  .pname{width:52%; font-weight:600}
+  /* 148px = uppmätt bredd för ett native datumfält (fältet + kalenderikonen). auto-fit lägger
+     fälten på egen rad när kortet är för smalt i stället för att klämma dem; min(100%,…) hindrar
+     överflöd när kortet är smalare än 148px. */
+  .period .fields{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,148px),1fr)); gap:8px; margin-bottom:12px}
+  .period .fields.one{grid-template-columns:1fr; margin:4px 0 0}
+  .period label{font-size:.7rem; min-width:0}
+  .period input{width:100%; min-width:0}
   .period .target{font-family:var(--mono); font-size:1.5rem; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
-  .period .line{font-size:.84rem; color:var(--muted); margin-top:5px}
-  .period .line b{font-family:var(--mono); color:var(--ink); font-weight:600}
+  .period .line{font-size:.84rem; color:var(--muted); margin:5px 0 0}
+  .period .line.sep{margin-top:8px} /* extra luft före auto-raden, som förut */
+  .period .line strong{font-family:var(--mono); color:var(--ink); font-weight:600}
+  .period .target{margin:0}
   .acts{margin-top:12px} .acts summary{font-size:.78rem}
   .actrow{display:grid; grid-template-columns:1fr 60px auto; gap:6px; margin:6px 0; align-items:center}
   .actrow input[type=number]{width:100%}
@@ -155,86 +187,100 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="masthead">
+<main class="wrap">
+  <header class="masthead">
     <p class="kicker">Ferietjänst · Läsår 26/27</p>
     <h1>Arbetstid</h1>
     <p class="sub">Kolla att schemat täcker varje kurs, och håll koll på din reglerade arbetstid över läsåret.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Vyer">
+    <button class="tab" type="button" role="tab" id="tab-coverage" data-view="coverage"
+            aria-controls="view-coverage" aria-selected="true">Täckning per kurs</button>
+    <button class="tab" type="button" role="tab" id="tab-budget" data-view="budget"
+            aria-controls="view-budget" aria-selected="false" tabindex="-1">Arbetstidsbudget</button>
   </div>
 
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" data-view="coverage" aria-selected="true">Täckning per kurs</button>
-    <button class="tab" role="tab" data-view="budget" aria-selected="false">Arbetstidsbudget</button>
-  </div>
-
-  <div class="view" id="view-coverage">
-  <div class="card">
-    <h2>Läsår &amp; schema</h2>
-    <div class="row">
-      <label>Från<input type="date" id="from"></label>
-      <label>Till<input type="date" id="to"></label>
-      <label>&nbsp;<button class="btn primary" id="importBtn">Importera .ics</button></label>
-      <input type="file" id="file" accept=".ics" hidden>
-      <span class="filestat" id="filestat">Inget schema laddat</span>
-    </div>
-    <p class="hint">Exportera din kalender från Outlook (Arkiv → Spara kalender → Fullständig information) och importera .ics-filen. Allt räknas lokalt i din webbläsare — inget skickas någonstans.</p>
-  </div>
-
-  <div class="card">
-    <h2>Sammanfattning</h2>
-    <div class="summary" id="summary"></div>
-  </div>
-
-  <div class="card">
-    <h2>Kurser</h2>
-    <div class="tblwrap">
-      <table id="tbl">
-        <thead><tr>
-          <th>Kurs</th><th>Schemalagt</th><th>Tillägg</th><th>Totalt</th><th>Krav</th><th>Diff</th><th>Status</th><th>Not</th><th></th>
-        </tr></thead>
-        <tbody id="rows"></tbody>
-        <tfoot id="foot"></tfoot>
-      </table>
-    </div>
-    <p class="hint"><b>Tillägg</b> = timmar du fyller i själv, t.ex. en termin som inte är schemalagd än, eller kurser (GYARTE, mentorstid) som inte ligger som kalenderhändelser.</p>
-    <button class="btn" id="addCourse" style="margin-top:12px">+ Lägg till kurs</button>
-  </div>
-
-  <div class="card">
-    <details id="unmatchedBox">
-      <summary>Kalenderhändelser som inte matchar någon kurs (<span id="umCount">0</span>)</summary>
-      <ul class="unmatched" id="unmatched"></ul>
-      <p class="hint">Om en kurs döpts om i schemat dyker den upp här. Byt kurskoden ovan så den matchar, eller lägg till den som ny kurs.</p>
-    </details>
-  </div>
-  </div><!-- /view-coverage -->
-
-  <div class="view" id="view-budget" hidden>
-    <div class="yearband" id="yearband"></div>
-
-    <div class="hero">
-      <div class="lbl" id="heroLbl">Just nu</div>
-      <div class="big" id="heroBig">—</div>
-      <div class="line" id="heroLine"></div>
-    </div>
-
-    <div class="card">
-      <h2>Din tid</h2>
+  <div class="view" id="view-coverage" role="tabpanel" aria-labelledby="tab-coverage" tabindex="0">
+    <section class="card" aria-labelledby="h-schema">
+      <h2 id="h-schema">Läsår &amp; schema</h2>
       <div class="row">
-        <label>Tjänstgöring %<input type="number" step="1" id="pct" style="width:80px"></label>
-        <label>Reglerad tid vid 100% (h)<input type="number" step="1" id="reg100" style="width:92px"></label>
+        <label>Från<input type="date" class="date" id="from"></label>
+        <label>Till<input type="date" class="date" id="to"></label>
+        <button class="btn primary" type="button" id="importBtn">Importera .ics</button>
+        <input type="file" id="file" accept=".ics" hidden>
+        <output class="filestat" id="filestat" for="file">Inget schema laddat</output>
       </div>
-      <div class="summary" id="budgetSummary" style="margin-top:16px"></div>
-      <p class="hint">Reglerad tid = <b id="regShow">–</b> h delas i 4 avstämningsperioder. Förtroendetiden sköter du själv — den visas bara som påminnelse, den ska inte loggas. Undervisningen räknas automatiskt från ditt importerade schema (t.o.m. idag) — du fyller bara i <b>övrigt arbete</b> (planering, rättning, GYARTE, konferens…) som en klumpsumma per period. Jobbar du ihop dig på hösten? Lägg fler måltimmar på höstperioderna och färre på APL-perioden — <b>mot plan i år</b> visar hur många timmar du bankat att ta av när eleverna är på APL.</p>
-    </div>
+      <p class="hint">Exportera din kalender från Outlook (Arkiv → Spara kalender → Fullständig information) och importera .ics-filen. Allt räknas lokalt i din webbläsare — inget skickas någonstans.</p>
+    </section>
 
-    <div class="card">
-      <h2>Avstämningsperioder</h2>
-      <div class="periods" id="periods"></div>
+    <section class="card" aria-labelledby="h-summering">
+      <h2 id="h-summering">Sammanfattning</h2>
+      <dl class="summary" id="summary"></dl>
+    </section>
+
+    <section class="card" aria-labelledby="h-kurser">
+      <h2 id="h-kurser">Kurser</h2>
+      <div class="tblwrap">
+        <table id="tbl">
+          <caption class="sr-only">Schemalagda timmar per kurs jämfört med kravet enligt tjänstefördelningen.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Kurs</th>
+              <th scope="col">Schemalagt</th>
+              <th scope="col">Tillägg</th>
+              <th scope="col">Totalt</th>
+              <th scope="col">Krav</th>
+              <th scope="col">Diff</th>
+              <th scope="col">Status</th>
+              <th scope="col">Not</th>
+              <th scope="col"><span class="sr-only">Ta bort kurs</span></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+          <tfoot id="foot"></tfoot>
+        </table>
+      </div>
+      <p class="hint"><strong>Tillägg</strong> = timmar du fyller i själv, t.ex. en termin som inte är schemalagd än, eller kurser (GYARTE, mentorstid) som inte ligger som kalenderhändelser.</p>
+      <button class="btn" type="button" id="addCourse">+ Lägg till kurs</button>
+    </section>
+
+    <section class="card" aria-label="Ohanterade kalenderhändelser">
+      <details id="unmatchedBox">
+        <summary>Kalenderhändelser som inte matchar någon kurs (<span id="umCount">0</span>)</summary>
+        <ul class="unmatched" id="unmatched"></ul>
+        <p class="hint">Om en kurs döpts om i schemat dyker den upp här. Byt kurskoden ovan så den matchar, eller lägg till den som ny kurs.</p>
+      </details>
+    </section>
+  </div>
+
+  <div class="view" id="view-budget" role="tabpanel" aria-labelledby="tab-budget" tabindex="0" hidden>
+    <figure class="yearband" id="yearband"></figure>
+
+    <section class="hero" aria-labelledby="heroLbl">
+      <h2 class="lbl" id="heroLbl">Just nu</h2>
+      <p class="big" id="heroBig">—</p>
+      <p class="line" id="heroLine"></p>
+    </section>
+
+    <section class="card" aria-labelledby="h-dintid">
+      <h2 id="h-dintid">Din tid</h2>
+      <div class="row">
+        <label>Tjänstgöring %<input type="number" step="1" min="0" max="100" id="pct"></label>
+        <label>Reglerad tid vid 100% (h)<input type="number" step="1" min="0" id="reg100"></label>
+        <label>Lovveckor (v-nr)<input type="text" id="lov" inputmode="numeric" placeholder="33,34,44,53,7,15,25"></label>
+      </div>
+      <dl class="summary" id="budgetSummary"></dl>
+      <p class="hint">Reglerad tid = <output id="regShow">–</output> h delas i 4 avstämningsperioder. Förtroendetiden sköter du själv — den visas bara som påminnelse, den ska inte loggas. Undervisningen räknas automatiskt från ditt importerade schema (t.o.m. idag) — du fyller bara i <strong>övrigt arbete</strong> (planering, rättning, GYARTE, konferens…) som en klumpsumma per period. Jobbar du ihop dig på hösten? Lägg fler måltimmar på höstperioderna och färre på APL-perioden — <strong>mot plan i år</strong> visar hur många timmar du bankat att ta av när eleverna är på APL.</p>
+    </section>
+
+    <section class="card" aria-labelledby="h-perioder">
+      <h2 id="h-perioder">Avstämningsperioder</h2>
+      <ol class="periods" id="periods"></ol>
       <p class="hint" id="periodSumHint"></p>
-    </div>
-  </div><!-- /view-budget -->
-</div>
+    </section>
+  </div>
+</main>
 
 <script>
 const KEY = "arbetstid-tackning-v2";
@@ -255,14 +301,15 @@ const DEFAULTS = {
   ],
   budget:{
     pct:80, reg100:1360, arstid100:1767,
+    lov:"33,34,44,53,7,15,25", // v33–34 uppstart, v44 höstlov, v53 jullov, v07 sportlov, v15 påsklov, v25 terminsslut
     periods:[
-      {label:"Period 1", start:"2026-08-11", end:"2026-10-31", weeks:11, hours:272, logged:0, activities:[]},
-      {label:"Period 2", start:"2026-11-01", end:"2027-01-15", weeks:9,  hours:272, logged:0, activities:[]},
-      {label:"Period 3", start:"2027-01-16", end:"2027-03-31", weeks:10, hours:272, logged:0, activities:[
+      {label:"Period 1", start:"2026-08-11", end:"2026-10-31", hours:272, logged:0, activities:[]},
+      {label:"Period 2", start:"2026-11-01", end:"2027-01-15", hours:272, logged:0, activities:[]},
+      {label:"Period 3", start:"2027-01-16", end:"2027-03-31", hours:272, logged:0, activities:[
         {name:"Gymnasiearbete – handledning", hours:0},
         {name:"UF", hours:0},{name:"Blixtlåset", hours:0},
         {name:"Tävlingar (lokala)", hours:0},{name:"Övrigt", hours:0}]},
-      {label:"Period 4", start:"2027-04-01", end:"2027-06-12", weeks:9,  hours:272, logged:0, activities:[
+      {label:"Period 4", start:"2027-04-01", end:"2027-06-12", hours:272, logged:0, activities:[
         {name:"Rättning & bedömning", hours:0},
         {name:"Betygsinmatning & omdömen", hours:0},
         {name:"Gymnasiearbete – bedömning", hours:0},{name:"Övrigt", hours:0}]},
@@ -275,6 +322,7 @@ function load(){
   try{ const s = JSON.parse(localStorage.getItem(KEY));
     if(s&&s.courses){
       const b = s.budget || structuredClone(DEFAULTS.budget);
+      b.lov ??= DEFAULTS.budget.lov; // sparad state från före lov-fältet
       if(b.periods) b.periods.forEach((p,i)=>{ if(!p.activities) p.activities = structuredClone((DEFAULTS.budget.periods[i]||{}).activities||[]); });
       return {...structuredClone(DEFAULTS), ...s, budget:b};
     }
@@ -307,6 +355,19 @@ function dt(v){
   const m=v.match(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})/);
   if(!m) return null;
   return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]); // treat as local wall-clock
+}
+
+// ---- datum ----
+// Native <input type="date">: värdet är alltid "" eller åååå-mm-dd oavsett hur det VISAS
+// (visningsformatet styrs av OS/webbläsarens locale, inte av sidan).
+const DATEATTR = 'type="date" class="date"';
+// Guard mot tomt/orimligt värde innan det når state — ett rensat datumfält ger ""
+// och new Date("T00:00:00") => Invalid Date, vilket förgiftar all räkning nedströms.
+// Rundtursvalidering: 2026-02-30 matchar mönstret men rullar över till 2 mars — jämför delarna.
+function isISO(s){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y,m,d]=s.split("-").map(Number), t=new Date(y,m-1,d);
+  return t.getFullYear()===y && t.getMonth()===m-1 && t.getDate()===d;
 }
 
 // ---- compute + render ----
@@ -345,21 +406,22 @@ function render(){
     const label = {good:"Täckt", warn:"Nära", bad:"Underskott"}[st];
     tSched+=sched; tTot+=tot; tReq+=req;
     const tr=document.createElement("tr"); tr.className="s-"+st;
+    const kod = esc(c.code);
     tr.innerHTML =
-      `<td class="code"><input type="text" value="${esc(c.code)}" data-i="${idx}" data-f="code" style="width:120px"></td>
+      `<th scope="row" class="code"><input class="in-code" type="text" value="${kod}" aria-label="Kurskod" data-i="${idx}" data-f="code"></th>
        <td>${sched.toFixed(1)}</td>
-       <td><input type="number" step="0.5" value="${man}" data-i="${idx}" data-f="manual"></td>
+       <td><input type="number" step="0.5" value="${man}" aria-label="Tillägg för ${kod} (h)" data-i="${idx}" data-f="manual"></td>
        <td>${tot.toFixed(1)}</td>
-       <td><input type="number" step="1" value="${req}" data-i="${idx}" data-f="required"></td>
+       <td><input type="number" step="1" min="0" value="${req}" aria-label="Krav för ${kod} (h)" data-i="${idx}" data-f="required"></td>
        <td class="diff ${diff>=0?'pos':'neg'}">${diff>=0?'+':''}${diff.toFixed(1)}</td>
        <td><span class="pill ${st}">${label}</span></td>
-       <td><input type="text" value="${esc(c.note||'')}" data-i="${idx}" data-f="note" placeholder="—" style="width:190px"></td>
-       <td><button class="del" data-del="${idx}" title="Ta bort">×</button></td>`;
+       <td><input class="in-note" type="text" value="${esc(c.note||'')}" aria-label="Not för ${kod}" placeholder="—" data-i="${idx}" data-f="note"></td>
+       <td><button class="del" type="button" data-del="${idx}" aria-label="Ta bort ${kod}">×</button></td>`;
     rows.appendChild(tr);
   });
 
   document.getElementById("foot").innerHTML = state.courses.length ?
-    `<tr><td>Summa</td><td>${tSched.toFixed(1)}</td><td></td><td>${tTot.toFixed(1)}</td><td>${tReq.toFixed(1)}</td>
+    `<tr><th scope="row">Summa</th><td>${tSched.toFixed(1)}</td><td></td><td>${tTot.toFixed(1)}</td><td>${tReq.toFixed(1)}</td>
      <td class="diff ${tTot-tReq>=0?'pos':'neg'}">${tTot-tReq>=0?'+':''}${(tTot-tReq).toFixed(1)}</td><td></td><td></td><td></td></tr>` : "";
 
   // summary tiles
@@ -377,7 +439,8 @@ function render(){
     um.length ? um.map(([s,h])=>`<li>${esc(s)} — <span class="muted">${h.toFixed(1)} h</span></li>`).join("")
               : `<li class="muted">Inga — alla händelser matchar en kurs eller så är inget schema laddat.</li>`;
 }
-function tile(n,k){ return `<div class="tile"><div class="n">${n}</div><div class="k">${k}</div></div>`; }
+// <dl>: dt före dd i källan (spec), värdet visas överst via flex column-reverse.
+function tile(n,k){ return `<div class="tile"><dt class="k">${k}</dt><dd class="n">${n}</dd></div>`; }
 function esc(s){ return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 
 // ---- events ----
@@ -388,8 +451,8 @@ document.getElementById("file").onchange=e=>{
   r.onload=()=>{ state.events=parseICS(r.result); state.fileName=f.name; save(); render(); renderBudget(); };
   r.readAsText(f);
 };
-document.getElementById("from").onchange=e=>{ state.from=e.target.value; save(); render(); };
-document.getElementById("to").onchange=e=>{ state.to=e.target.value; save(); render(); };
+document.getElementById("from").onchange=e=>{ if(!isISO(e.target.value)) return render(); state.from=e.target.value; save(); render(); };
+document.getElementById("to").onchange=e=>{ if(!isISO(e.target.value)) return render(); state.to=e.target.value; save(); render(); };
 document.getElementById("rows").addEventListener("input",e=>{
   const t=e.target, i=t.dataset.i, f=t.dataset.f; if(i==null) return;
   state.courses[i][f] = t.value;
@@ -405,6 +468,32 @@ document.getElementById("addCourse").onclick=()=>{ state.courses.push({code:"NY"
 
 // ---- budget module ----
 function fmt(n){ return (Math.round(n*10)/10).toFixed(1); }
+
+// ---- arbetsveckor: lov-veckor räknas bort ----
+function parseLov(s){ return new Set(String(s||"").split(/[^0-9]+/).filter(Boolean).map(Number)); }
+function mondayOf(d){ const t=new Date(d.getFullYear(),d.getMonth(),d.getDate()); t.setDate(t.getDate()-((t.getDay()||7)-1)); return t; }
+function isoWeek(d){
+  const t=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  t.setDate(t.getDate()+4-(t.getDay()||7)); // torsdagen i samma ISO-vecka avgör veckonumret
+  return Math.ceil(((t-new Date(t.getFullYear(),0,1))/864e5+1)/7);
+}
+// Arbetsveckor i [s,e] samt hur många av dem som passerat vid `now` (innevarande vecka räknas delvis).
+// ponytail: hela veckor — en vecka som bara delvis ligger i perioden räknas helt. Räcker för periodgränser lagda vid terminsskiften.
+function weekSpan(s,e,lov,now){
+  let total=0, elapsed=0;
+  for(let m=mondayOf(s); m<=e; m=new Date(m.getFullYear(),m.getMonth(),m.getDate()+7)){
+    if(lov.has(isoWeek(m))) continue;
+    total++;
+    elapsed += Math.max(0, Math.min(1, (now-m)/6.048e8)); // 6.048e8 ms = 7 dygn
+  }
+  return {total, elapsed};
+}
+function lovIn(s,e,lov){
+  const w=[];
+  for(let m=mondayOf(s); m<=e; m=new Date(m.getFullYear(),m.getMonth(),m.getDate()+7))
+    if(lov.has(isoWeek(m))) w.push("v"+String(isoWeek(m)).padStart(2,"0"));
+  return w.length? ` <span class="muted">(lov: ${w.join(", ")})</span>` : "";
+}
 function renderBudget(){
   const b=state.budget;
   document.getElementById("pct").value=b.pct;
@@ -415,12 +504,14 @@ function renderBudget(){
   document.getElementById("regShow").textContent=Math.round(reglerad);
 
   const now=new Date();
+  const lov=parseLov(b.lov);
+  document.getElementById("lov").value=b.lov||"";
   const courseCodes=new Set(state.courses.map(c=>norm(c.code)));
   const cont=document.getElementById("periods"); cont.innerHTML="";
   const segs=[];
-  let sumHours=0, sumLogged=0, sumExpected=0, active=null;
+  let sumHours=0, sumLogged=0, sumExpected=0, sumWeeks=0, active=null;
   b.periods.forEach((p,idx)=>{
-    const weeks=+p.weeks||0, hours=+p.hours||0, manual=+p.logged||0;
+    const hours=+p.hours||0, manual=+p.logged||0;
     const acts=p.activities||[];
     const estSum=acts.reduce((sum,a)=>sum+(+a.hours||0),0);
     const s=new Date(p.start+"T00:00:00"), e=new Date(p.end+"T23:59:59"), span=e-s;
@@ -430,13 +521,16 @@ function renderBudget(){
       if(d>=s.getTime() && d<=cut && courseCodes.has(norm(ev.summary))) auto+=ev.hours; }
     const logged=auto+manual;
     sumHours+=hours; sumLogged+=logged;
-    let frac = span>0 ? (now-s)/span : 0; frac=Math.max(0,Math.min(1,frac));
+    // Plan följer arbetsveckor, inte kalenderdagar — annars "tappar" du timmar under lov.
+    const {total:weeks, elapsed:weeksDone} = weekSpan(s,e,lov,now);
+    const frac = weeks? Math.max(0,Math.min(1,weeksDone/weeks)) : 0;
+    sumWeeks += weeks;
     const started=now>=s, ended=now>e;
     const perWeek = weeks? hours/weeks : 0;
     const balance = logged - hours*frac;
     sumExpected += hours*frac;
     const remH = hours-logged;
-    const remWeeks = ended?0: weeks*(1-frac);
+    const remWeeks = ended?0: Math.max(0, weeks-weeksDone);
     const pace = (remH>0 && remWeeks>0)? remH/remWeeks : 0;
 
     let st="", label="Kommande";
@@ -446,38 +540,42 @@ function renderBudget(){
       label = balance>=0?"I fas": balance> -0.1*hours?"Något efter":"Efter plan";
     }
     segs.push({label:p.label, start:s, end:e, days:Math.max(Math.round(span/8.64e7),1),
-      fillPct: hours>0? Math.max(0,Math.min(1,logged/hours))*100 : 0, st, started, perWeek});
+      fillPct: hours>0? Math.max(0,Math.min(1,logged/hours))*100 : 0, st, started, perWeek, logged, hours});
 
-    const div=document.createElement("div");
-    div.className="period"+(started&&!ended?" active":"")+(st?" s-"+st:"");
-    div.innerHTML=
-      `<h3><input type="text" value="${esc(p.label)}" data-p="${idx}" data-f="label" style="width:52%">
-         <span class="pill ${st}">${label}</span></h3>
+    const namn=esc(p.label);
+    const li=document.createElement("li");
+    li.className="period"+(started&&!ended?" active":"")+(st?" s-"+st:"");
+    li.innerHTML=
+      `<p class="phead">
+         <label class="sr-only" for="pname-${idx}">Periodens namn</label>
+         <input class="pname" id="pname-${idx}" type="text" value="${namn}" data-p="${idx}" data-f="label">
+         <span class="pill ${st}">${label}</span></p>
        <div class="fields">
-         <label>Från<input type="date" value="${p.start}" data-p="${idx}" data-f="start"></label>
-         <label>Till<input type="date" value="${p.end}" data-p="${idx}" data-f="end"></label>
-         <label>Arbetsveckor<input type="number" step="1" value="${weeks}" data-p="${idx}" data-f="weeks"></label>
-         <label>Måltimmar<input type="number" step="1" value="${hours}" data-p="${idx}" data-f="hours"></label>
+         <label>Från<input ${DATEATTR} value="${p.start}" data-p="${idx}" data-f="start"></label>
+         <label>Till<input ${DATEATTR} value="${p.end}" data-p="${idx}" data-f="end"></label>
+         <label>Måltimmar<input type="number" step="1" min="0" value="${hours}" data-p="${idx}" data-f="hours"></label>
        </div>
-       <div class="target">${fmt(perWeek)} h/vecka</div>
-       <div class="line">mål för perioden</div>
-       <div class="line" style="margin-top:8px">Undervisning (auto): <b>${fmt(auto)} h</b></div>
-       <div class="fields" style="margin-top:4px;grid-template-columns:1fr">
-         <label>Övrigt arbete hittills (h)<input type="number" step="0.5" value="${manual}" data-p="${idx}" data-f="logged"></label>
+       <p class="target">${fmt(perWeek)} h/vecka</p>
+       <p class="line">mål över <strong>${weeks}</strong> arbetsveckor${lovIn(s,e,lov)}</p>
+       <p class="line sep">Undervisning (auto): <strong>${fmt(auto)} h</strong></p>
+       <div class="fields one">
+         <label>Övrigt arbete hittills (h)<input type="number" step="0.5" min="0" value="${manual}" data-p="${idx}" data-f="logged"></label>
        </div>
-       <div class="line">Loggat totalt: <b>${fmt(logged)} h</b> · Kvar: <b>${fmt(remH)} h</b></div>
-       ${started&&!ended ? `<div class="line">Ligger <b>${balance>=0?'+':''}${fmt(balance)} h</b> mot plan</div>
-         <div class="line">Klara resten: <b>${fmt(pace)} h/vecka</b> i ${fmt(remWeeks)} v</div>` : ""}
+       <p class="line">Loggat totalt: <strong>${fmt(logged)} h</strong> · Kvar: <strong>${fmt(remH)} h</strong></p>
+       ${started&&!ended ? `<p class="line">Ligger <strong>${balance>=0?'+':''}${fmt(balance)} h</strong> mot plan</p>
+         <p class="line">Klara resten: <strong>${fmt(pace)} h/vecka</strong> i ${fmt(remWeeks)} v</p>` : ""}
        <details class="acts"${acts.length?" open":""}>
-         <summary>Innehåll — uppskattat <b>${fmt(estSum)} h</b>${Math.abs(estSum-hours)>=1&&acts.length?` (mål ${fmt(hours)} h)`:""}</summary>
-         ${acts.map((a,ai)=>`<div class="actrow">
-            <input type="text" value="${esc(a.name)}" data-p="${idx}" data-ai="${ai}" data-af="name" placeholder="uppgift">
-            <input type="number" step="0.5" value="${+a.hours||0}" data-p="${idx}" data-ai="${ai}" data-af="hours">
-            <button class="del" data-p="${idx}" data-delact="${ai}" title="Ta bort">×</button>
-          </div>`).join("")}
-         <button class="btn" data-p="${idx}" data-addact="1">+ uppgift</button>
+         <summary>Innehåll — uppskattat <strong>${fmt(estSum)} h</strong>${Math.abs(estSum-hours)>=1&&acts.length?` (mål ${fmt(hours)} h)`:""}</summary>
+         <ul class="actlist">
+           ${acts.map((a,ai)=>`<li class="actrow">
+              <input type="text" value="${esc(a.name)}" aria-label="Uppgift ${ai+1} i ${namn}" data-p="${idx}" data-ai="${ai}" data-af="name" placeholder="uppgift">
+              <input type="number" step="0.5" min="0" value="${+a.hours||0}" aria-label="Uppskattade timmar för uppgift ${ai+1} i ${namn}" data-p="${idx}" data-ai="${ai}" data-af="hours">
+              <button class="del" type="button" data-p="${idx}" data-delact="${ai}" aria-label="Ta bort uppgift ${ai+1} i ${namn}">×</button>
+            </li>`).join("")}
+         </ul>
+         <button class="btn" type="button" data-p="${idx}" data-addact="1">+ uppgift</button>
        </details>`;
-    cont.appendChild(div);
+    cont.appendChild(li);
   });
 
   renderYearband(segs, now);
@@ -504,8 +602,9 @@ function renderBudget(){
 
   const diff=sumHours-reglerad;
   document.getElementById("periodSumHint").textContent =
-    Math.abs(diff)<1 ? `Perioderna summerar till ${fmt(sumHours)} h = din reglerade tid.`
-      : `Perioderna summerar till ${fmt(sumHours)} h, men reglerad tid är ${Math.round(reglerad)} h (${diff>0?'+':''}${fmt(diff)} h). Justera måltimmarna.`;
+    (Math.abs(diff)<1 ? `Perioderna summerar till ${fmt(sumHours)} h = din reglerade tid.`
+      : `Perioderna summerar till ${fmt(sumHours)} h, men reglerad tid är ${Math.round(reglerad)} h (${diff>0?'+':''}${fmt(diff)} h). Justera måltimmarna.`)
+    + ` Arbetsveckor efter avdrag för lov: ${sumWeeks} (194 A-dagar ≈ 39 veckor).`;
 }
 
 function renderYearband(segs, now){
@@ -516,26 +615,36 @@ function renderYearband(segs, now){
   const todayFrac=Math.max(0,Math.min(1, totalSpan>0? (now-start0)/totalSpan : 0));
   const track = segs.map(s=>{
     const cls = s.st? "s-"+s.st : (s.started? "" : "up");
-    return `<div class="seg ${cls}" style="flex-grow:${s.days}">
-       <div class="cap">${esc(s.label)}<br>${fmt(s.perWeek)} h/v</div>
-       <div class="tube"><div class="fill" style="height:${s.fillPct.toFixed(1)}%"></div></div>
-     </div>`;
+    // Röret är rent visuellt (aria-hidden) — sr-only-texten är dess textmotsvarighet.
+    return `<li class="seg ${cls}" style="flex-grow:${s.days}">
+       <p class="cap">${esc(s.label)}<br>${fmt(s.perWeek)} h/v</p>
+       <span class="sr-only">${fmt(s.logged)} av ${fmt(s.hours)} h loggat</span>
+       <div class="tube" aria-hidden="true"><div class="fill" style="height:${s.fillPct.toFixed(1)}%"></div></div>
+     </li>`;
   }).join("");
-  const todayLine = (before||after)? "" : `<div class="today" style="left:${(todayFrac*100).toFixed(2)}%"></div>`;
+  const todayLine = (before||after)? "" : `<div class="today" style="left:${(todayFrac*100).toFixed(2)}%" aria-hidden="true"></div>`;
   const note = before? "Läsåret har inte börjat än." : after? "Läsåret är slut."
     : "Rören fylls när du loggar tid. Den lodräta linjen är idag.";
   el.innerHTML =
-    `<div class="band"><div class="track">${track}${todayLine}</div>
-       <div class="summer"><span>sommar</span></div></div>
-     <p class="band-cap">${note} Sista fältet är sommaren.</p>`;
+    `<div class="band">
+       <div class="track"><ol class="segs">${track}</ol>${todayLine}</div>
+       <div class="summer" aria-hidden="true"><span>sommar</span></div>
+     </div>
+     <figcaption class="band-cap">${note} Sista fältet är sommaren.</figcaption>`;
 }
 
 document.getElementById("pct").addEventListener("change",e=>{ state.budget.pct=e.target.value; save(); renderBudget(); });
 document.getElementById("reg100").addEventListener("change",e=>{ state.budget.reg100=e.target.value; save(); renderBudget(); });
+document.getElementById("lov").addEventListener("change",e=>{ state.budget.lov=e.target.value; save(); renderBudget(); });
 document.getElementById("periods").addEventListener("change",e=>{
   const t=e.target, p=t.dataset.p; if(p==null) return;
   if(t.dataset.af!=null){ (state.budget.periods[p].activities ||= [])[t.dataset.ai][t.dataset.af]=t.value; }
-  else if(t.dataset.f!=null){ state.budget.periods[p][t.dataset.f]=t.value; }
+  else if(t.dataset.f!=null){
+    const f=t.dataset.f;
+    // Ogiltigt datum får inte nå state — allt nedströms räknar med new Date(start+"T00:00:00").
+    if((f==="start"||f==="end") && !isISO(t.value)) return renderBudget();
+    state.budget.periods[p][f]=t.value;
+  }
   else return;
   save(); renderBudget();
 });
@@ -545,12 +654,26 @@ document.getElementById("periods").addEventListener("click",e=>{
   if(t.dataset.addact!=null){ per.activities.push({name:"",hours:0}); save(); renderBudget(); }
   else if(t.dataset.delact!=null){ per.activities.splice(+t.dataset.delact,1); save(); renderBudget(); }
 });
-document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
-  document.querySelectorAll(".tab").forEach(x=>x.setAttribute("aria-selected", x===btn));
-  document.getElementById("view-coverage").hidden = btn.dataset.view!=="coverage";
-  document.getElementById("view-budget").hidden = btn.dataset.view!=="budget";
+// ---- flikar: fullständigt ARIA tabs-mönster (aria-controls, roving tabindex, piltangenter) ----
+const tabs=[...document.querySelectorAll(".tab")];
+function selectTab(btn){
+  for(const t of tabs){
+    const on = t===btn;
+    t.setAttribute("aria-selected", on);
+    t.tabIndex = on? 0 : -1; // roving tabindex: bara aktiv flik nås med Tab
+    document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+  }
   if(btn.dataset.view==="budget") renderBudget();
-}));
+}
+tabs.forEach(btn=>btn.addEventListener("click",()=>selectTab(btn)));
+document.querySelector(".tabs").addEventListener("keydown",e=>{
+  const i=tabs.indexOf(document.activeElement); if(i<0) return;
+  const j = {ArrowRight:i+1, ArrowLeft:i-1, Home:0, End:tabs.length-1}[e.key];
+  if(j==null) return;
+  e.preventDefault();
+  const next=tabs[(j+tabs.length)%tabs.length];
+  next.focus(); selectTab(next);
+});
 
 // ---- self-test (console) ----
 (function(){
@@ -560,6 +683,21 @@ document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>
   console.assert(ev.length===2 && Math.abs(ev[0].hours-2)<1e-9 && Math.abs(ev[1].hours-0.5)<1e-9, "parseICS self-test FAILED", ev);
   const perWeek=272/8, balance=100-272*0.5;
   console.assert(Math.abs(perWeek-34)<1e-9 && Math.abs(balance+36)<1e-9, "budget self-test FAILED", perWeek, balance);
+
+  // lov: v53 (mån 2026-12-28) och v01 (mån 2027-01-04) är kända veckonummer
+  console.assert(isoWeek(new Date(2026,11,28))===53 && isoWeek(new Date(2027,0,4))===1, "isoWeek FAILED");
+  console.assert(mondayOf(new Date(2026,11,31)).getDate()===28, "mondayOf FAILED");
+  // 2026-11-30 → 2027-01-17: 7 kalenderveckor, v53 är lov ⇒ 6 arbetsveckor
+  const s=new Date(2026,10,30), e=new Date(2027,0,17,23,59,59);
+  const all=weekSpan(s,e,new Set(),e), less=weekSpan(s,e,new Set([53]),e);
+  console.assert(all.total===7 && less.total===6, "weekSpan FAILED", all, less);
+  // planen står still under lov: fraktionen mitt i v53 = fraktionen vid dess början
+  const f=(d)=>weekSpan(s,e,new Set([53]),d).elapsed;
+  console.assert(Math.abs(f(new Date(2026,11,31))-f(new Date(2026,11,28)))<1e-9, "lov ska inte flytta planen", f(new Date(2026,11,31)));
+
+  // ISO 8601 — 2026-02-30 matchar regexen men är inget datum
+  console.assert(["2026-08-11","2027-01-15"].every(isISO), "isISO ska släppa igenom giltiga datum");
+  console.assert(!["2026-02-30","2026-13-01","2026-00-10","2026-8-1","garbage",""].some(isISO), "isISO ska stoppa ogiltiga datum");
 })();
 
 render();
