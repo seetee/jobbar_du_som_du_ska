@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ffprobe *)",
+      "Bash(git --no-pager log *)",
+      "Bash(git --no-pager diff *)",
+      "Bash(git --no-pager show *)",
+      "Bash(git --no-pager tag *)",
+      "Bash(make test)",
+      "mcp__claude_ai_MDN_MCP__get-compat",
+      "mcp__claude_ai_MDN_MCP__search"
+    ]
+  }
+}
